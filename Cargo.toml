@@ -1,0 +1,33 @@
+# OKR Tracker — Cargo workspace
+#
+# Three crates per the spec (§3.1):
+#   core     — runtime-agnostic domain logic (pure, unit-tested)
+#   worker   — Cloudflare Worker entry + Org Durable Object (wasm32)
+#   frontend — Leptos CSR WASM SPA (wasm32)
+#
+# All dependency versions are pinned exactly (no ^/~ ranges) per §2 / §11.
+[workspace]
+resolver = "2"
+members = ["crates/core", "crates/worker", "crates/frontend"]
+
+[workspace.package]
+edition = "2021"
+license = "MIT"
+rust-version = "1.80"
+
+[workspace.dependencies]
+serde = { version = "=1.0.228", features = ["derive"] }
+serde_json = "=1.0.140"
+thiserror = "=1.0.69"
+getrandom = { version = "=0.2.15", features = ["js"] }
+uuid = { version = "=1.23.3", features = ["v4", "js", "serde"] }
+subtle = "=2.6.1"
+pulldown-cmark = { version = "=0.12.2", default-features = false, features = ["html"] }
+
+# Build profile for wasm artifacts: optimise for size, the spec's bundle budget (§13.1).
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

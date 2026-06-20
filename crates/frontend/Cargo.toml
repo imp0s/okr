@@ -1,0 +1,24 @@
+[package]
+name = "okr-frontend"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Leptos CSR WASM single-page app for the OKR Tracker."
+
+[dependencies]
+okr-core = { path = "../core" }
+serde.workspace = true
+serde_json.workspace = true
+
+leptos = { version = "=0.8.19", features = ["csr"] }
+leptos_router = "=0.8.9"
+wasm-bindgen = "=0.2.125"
+wasm-bindgen-futures = "=0.4.75"
+gloo-net = "=0.6.0"
+js-sys = "=0.3.102"
+web-sys = { version = "=0.3.102", features = [
+  "Window", "Navigator", "Document", "Location",
+  "Notification", "NotificationPermission",
+] }
+console_error_panic_hook = "=0.1.7"

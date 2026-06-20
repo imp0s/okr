@@ -1,0 +1,8 @@
+# Copy to `.dev.vars` for local `wrangler dev`. NEVER commit `.dev.vars`.
+# See docs/SECRETS.md for what each value is and how to generate it.
+RP_ID = "localhost"
+RP_ORIGIN = "http://localhost:8787"
+SETUP_SECRET = "dev-only-change-me"
+# Optional Web Push (leave blank to disable push locally):
+VAPID_PUBLIC_KEY = ""
+VAPID_PRIVATE_KEY = ""

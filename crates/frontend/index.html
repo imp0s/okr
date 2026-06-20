@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0b0b0c" media="(prefers-color-scheme: dark)" />
+    <title>OKR Tracker</title>
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/icon.svg" />
+
+    <!-- Hashed, immutable app shell -->
+    <link data-trunk rel="rust" data-wasm-opt="z" />
+    <link data-trunk rel="css" href="styles.css" />
+
+    <!-- Copied to the dist root (served from origin, satisfies CSP 'self') -->
+    <link data-trunk rel="copy-file" href="manifest.webmanifest" />
+    <link data-trunk rel="copy-file" href="sw.js" />
+    <link data-trunk rel="copy-file" href="register-sw.js" />
+    <link data-trunk rel="copy-file" href="icon.svg" />
+  </head>
+  <body>
+    <!-- Service-worker registration as an external module (no inline scripts). -->
+    <script type="module" src="/register-sw.js"></script>
+  </body>
+</html>

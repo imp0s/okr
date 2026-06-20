@@ -1,0 +1,93 @@
+name: CI
+
+# Quality gates (spec §13.1 / §13.3). These are the checks that must pass before
+# a PR can merge — configure them as required status checks in branch protection.
+on:
+  pull_request:
+  push:
+    branches-ignore: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings"
+
+jobs:
+  quality:
+    name: fmt / clippy / test / wasm
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+          targets: wasm32-unknown-unknown
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Format check
+        run: cargo fmt --all --check
+
+      - name: Clippy (native — core + tests)
+        run: cargo clippy -p okr-core --all-targets --all-features
+
+      - name: Clippy (wasm — worker + frontend)
+        run: cargo clippy -p okr-worker -p okr-frontend --target wasm32-unknown-unknown
+
+      - name: Unit + integration tests
+        run: cargo test --workspace --all-features
+
+      - name: WASM build (worker)
+        run: cargo build -p okr-worker --target wasm32-unknown-unknown --release
+
+      - name: WASM build (frontend)
+        run: cargo build -p okr-frontend --target wasm32-unknown-unknown --release
+
+  bundle-size:
+    name: Frontend bundle-size budget
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - name: Install trunk
+        run: cargo install trunk --version 0.21.7 --locked
+      - name: Build frontend
+        run: trunk build --release crates/frontend/index.html --dist dist
+      - name: Enforce budget (gzipped wasm <= 1.5 MB)
+        run: |
+          set -euo pipefail
+          WASM=$(find dist -name '*.wasm' | head -1)
+          SIZE=$(gzip -c "$WASM" | wc -c)
+          BUDGET=$((1500*1024))
+          echo "Gzipped wasm: $SIZE bytes (budget $BUDGET)"
+          if [ "$SIZE" -gt "$BUDGET" ]; then
+            echo "::error::Frontend bundle exceeds budget"; exit 1
+          fi
+
+  supply-chain:
+    name: cargo-deny (licenses + advisories)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check
+
+  dependency-review:
+    name: Dependency review
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/dependency-review-action@v4

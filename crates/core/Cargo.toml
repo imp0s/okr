@@ -1,0 +1,22 @@
+[package]
+name = "okr-core"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Runtime-agnostic OKR domain logic: versioning, revert, refs, authorization, sanitisation."
+
+[lib]
+name = "okr_core"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+getrandom.workspace = true
+uuid.workspace = true
+subtle.workspace = true
+pulldown-cmark.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true

@@ -1,0 +1,36 @@
+[package]
+name = "okr-worker"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Cloudflare Worker entry point and Org Durable Object for the OKR Tracker."
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+okr-core = { path = "../core" }
+serde.workspace = true
+serde_json.workspace = true
+getrandom.workspace = true
+
+# Cloudflare Workers runtime bindings (pinned). Provides the fetch entrypoint,
+# Durable Objects with the SQLite storage backend, Web Crypto and static assets.
+worker = "=0.8.5"
+worker-macros = "=0.8.5"
+wasm-bindgen = "=0.2.125"
+wasm-bindgen-futures = "=0.4.75"
+js-sys = "=0.3.102"
+console_error_panic_hook = "=0.1.7"
+
+# WebAuthn (ES256 / P-256) verification — pure-Rust, wasm-clean RustCrypto stack.
+# webauthn-rs is the spec's primary choice (§6.1); we implement the documented
+# in-house ES256 verifier fallback for guaranteed wasm32 compatibility.
+p256 = { version = "=0.13.2", default-features = false, features = ["ecdsa", "ecdh", "pem"] }
+sha2 = { version = "=0.10.8", default-features = false }
+ciborium = "=0.2.2"
+base64 = "=0.22.1"
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = false

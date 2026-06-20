@@ -1,0 +1,7 @@
+/target
+/dist
+/build
+node_modules
+# Local Worker dev secrets — never commit (see docs/SECRETS.md)
+.dev.vars
+.wrangler

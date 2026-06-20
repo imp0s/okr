@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="OKR Tracker">
+  <rect width="512" height="512" rx="96" fill="#4f46e5"/>
+  <circle cx="256" cy="256" r="150" fill="none" stroke="#ffffff" stroke-width="36"/>
+  <circle cx="256" cy="256" r="74" fill="none" stroke="#ffffff" stroke-width="36"/>
+  <circle cx="256" cy="256" r="20" fill="#ffffff"/>
+</svg>
