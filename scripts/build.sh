@@ -9,7 +9,9 @@ echo "==> Building Worker (Rust -> WASM) via worker-build"
 ( cd crates/worker && worker-build --release )
 
 echo "==> Building frontend SPA via trunk"
-# Target HTML must precede `--release` (the flag otherwise consumes the path).
-trunk build crates/frontend/index.html --release --dist dist
+# Run from the crate dir so trunk resolves okr-frontend as the root package
+# (it runs `cargo metadata` in the CWD, which must not be the workspace root).
+# Output to the repo-root ./dist that wrangler.toml serves as static assets.
+( cd crates/frontend && trunk build index.html --release --dist ../../dist )
 
 echo "==> Build complete: $(find dist -type f | wc -l) static asset(s)"

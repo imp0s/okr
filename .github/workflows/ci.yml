@@ -63,7 +63,8 @@ jobs:
       - name: Install trunk
         run: cargo install trunk --version 0.21.7 --locked
       - name: Build frontend
-        run: trunk build crates/frontend/index.html --release --dist dist
+        # Run from the crate dir (trunk resolves the root package from the CWD).
+        run: (cd crates/frontend && trunk build index.html --release --dist ../../dist)
       - name: Enforce budget (gzipped wasm <= 1.5 MB)
         run: |
           set -euo pipefail

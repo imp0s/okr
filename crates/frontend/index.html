@@ -10,10 +10,10 @@
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/icon.svg" />
 
-    <!-- Hashed, immutable app shell. `href` pins the workspace member crate so
-         trunk does not resolve the workspace root manifest (which has no
-         [package]) and fail with "could not find the root package". -->
-    <link data-trunk rel="rust" href="Cargo.toml" data-bin="okr-frontend" data-wasm-opt="z" />
+    <!-- Hashed, immutable app shell. Trunk is invoked from this crate's
+         directory (see scripts/build.sh / ci.yml) so it resolves okr-frontend
+         as the root package rather than the workspace root manifest. -->
+    <link data-trunk rel="rust" data-wasm-opt="z" />
     <link data-trunk rel="css" href="styles.css" />
 
     <!-- Copied to the dist root (served from origin, satisfies CSP 'self') -->
