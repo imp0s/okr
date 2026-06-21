@@ -78,7 +78,7 @@ For local `wrangler dev` provide config in a `.dev.vars` file:
   comment.
 - **Close a PR → preview destroyed** (`preview-teardown.yml`).
 - **Every PR → quality gates** (`ci.yml`): fmt, clippy (`-D warnings`), tests,
-  WASM builds, bundle-size budget, `cargo deny`, dependency review.
+  WASM builds, bundle-size budget, `cargo deny` (advisories + licenses + bans).
 
 **Secrets & variables — what they are, where to find them, how to add them:**
 see [`docs/SECRETS.md`](docs/SECRETS.md). Operations (deploy, rollback, bootstrap,

@@ -73,8 +73,10 @@ wrangler versions deploy "${PREV}@100" --yes
 Configure on `main` (`Settings → Branches → Add rule`):
 - Protect against deletion and force-push.
 - Require pull request review (≥ 1) and "up-to-date branch before merge".
-- Require status checks: **CI / quality**, **CI / bundle-size**,
-  **CI / supply-chain**, **CI / dependency-review**.
+- Require status checks: **fmt / clippy / test / wasm**, **Frontend
+  bundle-size budget**, **cargo-deny (licenses + advisories)**. (GitHub
+  Dependency Review is optional and only runs if you enable the repo's
+  Dependency Graph feature and re-add the job — see `ci.yml`.)
 - Linear history (squash or rebase); no direct pushes to `main`.
 
 ## 5. PR previews (spec §13.1.2/3)
