@@ -6,7 +6,9 @@
 # same file serves production and every per-PR preview unchanged.
 
 name = "okr-tracker"
-main = "build/worker/shim.mjs"
+# worker-build runs in crates/worker (so trunk/cargo resolve the right crate),
+# emitting the shim under that crate's build/ dir.
+main = "crates/worker/build/worker/shim.mjs"
 compatibility_date = "2024-11-01"
 compatibility_flags = ["nodejs_compat"]
 workers_dev = true
