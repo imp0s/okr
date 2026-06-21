@@ -84,15 +84,9 @@ jobs:
         with:
           command: check
 
-  dependency-review:
-    name: Dependency review
-    runs-on: ubuntu-latest
-    # Optional check (spec §13.1). Requires the repo's Dependency Graph feature
-    # (Settings → Code security → Dependency graph). Non-blocking so the PR is
-    # not gated when that org/repo setting is unavailable; supply-chain risk is
-    # still covered by the required `cargo deny` job.
-    continue-on-error: true
-    if: github.event_name == 'pull_request'
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/dependency-review-action@v4
+  # NOTE: GitHub's dependency-review-action (spec §13.1, optional) requires the
+  # repository's Dependency Graph feature (Settings → Code security). It is
+  # omitted here so it cannot gate PRs when that feature is unavailable; the
+  # required `cargo-deny` job above is the authoritative supply-chain gate
+  # (advisories + licenses + bans). Re-add a `dependency-review` job once
+  # Dependency Graph is enabled if you want PR-diff dependency scanning too.

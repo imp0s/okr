@@ -429,12 +429,20 @@ async fn register_verify(store: &SqlStore, cfg: &Config, body: &Value) -> Domain
         &cfg.rp_id,
         &cfg.rp_origin,
     )?;
-    store_credential(store, &ch.user_id, &reg).await?;
-    // Burn the code now that registration succeeded (single-use, §6.3).
+    // Re-validate AND burn the code *before* enrolling, atomically (the single
+    // Org DO serialises requests). This closes the window where a second
+    // outstanding challenge for the same code — or a challenge whose code was
+    // since reissued/invalidated — could still enrol a passkey (§6.3
+    // single-use / re-registration semantics).
     let data: Value = serde_json::from_str(&ch.data).unwrap_or(Value::Null);
-    store
-        .mark_code_used(str_field(&data, "code"), now_ms())
-        .await?;
+    let code = str_field(&data, "code");
+    let stored = store
+        .get_reg_code(code)
+        .await?
+        .ok_or(DomainError::BadRegistrationCode)?;
+    validate_reg_code(&stored, code, now_ms())?;
+    store.mark_code_used(code, now_ms()).await?;
+    store_credential(store, &ch.user_id, &reg).await?;
     finish_login(store, &ch.user_id).await
 }
 
@@ -1021,6 +1029,15 @@ async fn set_assignees(
                 .collect()
         })
         .unwrap_or_default();
+    // Validate every id refers to an existing, active user *before* mutating,
+    // so a bad id can't wipe the existing assignment set and then fail on the
+    // FK insert, leaving the OKR partially updated.
+    for uid in &user_ids {
+        match store.get_user(uid).await? {
+            Some(u) if u.status == UserStatus::Active => {}
+            _ => return Err(DomainError::Invalid(format!("unknown assignee: {uid}"))),
+        }
+    }
     let before = store.list_assignees(id).await?;
     store.set_assignees(id, &user_ids).await?;
     // Notify newly added assignees (§8).
