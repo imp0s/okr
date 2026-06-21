@@ -12,8 +12,12 @@
 
     <!-- Hashed, immutable app shell. Trunk is invoked from this crate's
          directory (see scripts/build.sh / ci.yml) so it resolves okr-frontend
-         as the root package rather than the workspace root manifest. -->
-    <link data-trunk rel="rust" data-wasm-opt="z" />
+         as the root package rather than the workspace root manifest.
+         wasm-opt is disabled: trunk's bundled wasm-opt (v116) cannot parse the
+         reference-types/multivalue features rustc >=1.82 emits by default. The
+         release wasm is already ~175 KB gzipped (well under budget) and modern
+         browsers run those features natively. -->
+    <link data-trunk rel="rust" data-wasm-opt="0" />
     <link data-trunk rel="css" href="styles.css" />
 
     <!-- Copied to the dist root (served from origin, satisfies CSP 'self') -->
