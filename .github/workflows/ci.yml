@@ -63,7 +63,7 @@ jobs:
       - name: Install trunk
         run: cargo install trunk --version 0.21.7 --locked
       - name: Build frontend
-        run: trunk build --release crates/frontend/index.html --dist dist
+        run: trunk build crates/frontend/index.html --release --dist dist
       - name: Enforce budget (gzipped wasm <= 1.5 MB)
         run: |
           set -euo pipefail
@@ -87,6 +87,11 @@ jobs:
   dependency-review:
     name: Dependency review
     runs-on: ubuntu-latest
+    # Optional check (spec §13.1). Requires the repo's Dependency Graph feature
+    # (Settings → Code security → Dependency graph). Non-blocking so the PR is
+    # not gated when that org/repo setting is unavailable; supply-chain risk is
+    # still covered by the required `cargo deny` job.
+    continue-on-error: true
     if: github.event_name == 'pull_request'
     steps:
       - uses: actions/checkout@v4

@@ -2,7 +2,13 @@
 [advisories]
 version = 2
 yanked = "deny"
-ignore = []
+# Unmaintained transitive build-macro deps pulled in only by the Leptos
+# proc-macro tree. No safe upgrade exists yet (they are not vulnerabilities,
+# just archived crates); revisit when Leptos updates its macro dependencies.
+ignore = [
+  "RUSTSEC-2026-0173", # proc-macro-error2 unmaintained (via leptos_macro)
+  "RUSTSEC-2024-0436", # paste unmaintained (via leptos/tachys)
+]
 
 [licenses]
 version = 2
@@ -13,6 +19,7 @@ allow = [
   "Apache-2.0 WITH LLVM-exception",
   "BSD-2-Clause",
   "BSD-3-Clause",
+  "BSL-1.0",
   "ISC",
   "Unicode-3.0",
   "Unicode-DFS-2016",
@@ -25,6 +32,7 @@ confidence-threshold = 0.9
 [bans]
 multiple-versions = "warn"
 wildcards = "deny"   # no wildcard version requirements (§2 pinning)
+allow-wildcard-paths = true   # ...except internal workspace `path` deps
 
 [sources]
 unknown-registry = "deny"
