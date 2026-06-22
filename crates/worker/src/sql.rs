@@ -27,7 +27,21 @@ impl SqlStore {
 
     /// Apply the embedded schema. Idempotent (`CREATE TABLE IF NOT EXISTS`).
     pub fn ensure_schema(&self) -> DomainResult<()> {
-        for stmt in include_str!("../../../migrations/0001_init.sql").split(';') {
+        // Strip `--` line comments before splitting on `;`. Otherwise a
+        // semicolon *inside* a comment (e.g. "additive; see RUNBOOK") fractures
+        // the script into a comment-only fragment, which DO SQLite rejects with
+        // "SQL code did not contain a statement". The schema has no string
+        // literals containing `--`, so this is safe.
+        let raw = include_str!("../../../migrations/0001_init.sql");
+        let stripped: String = raw
+            .lines()
+            .map(|line| match line.find("--") {
+                Some(i) => &line[..i],
+                None => line,
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        for stmt in stripped.split(';') {
             let s = stmt.trim();
             if !s.is_empty() {
                 self.sql.exec(s, None).map_err(db)?;
