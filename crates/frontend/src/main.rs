@@ -127,10 +127,11 @@ fn Dashboard(user: Me, on_logout: impl Fn() + 'static + Copy + Send + Sync) -> i
     let groups = RwSignal::new(Vec::<Value>::new());
     let okrs = RwSignal::new(Vec::<Value>::new());
     let users = RwSignal::new(Vec::<Value>::new());
-    let status = RwSignal::new(String::new());
     let is_admin = user.is_admin;
     // Copy-able owned id for use inside nested per-item closures.
     let me_id = StoredValue::new(user.id.clone());
+    // Which page is shown: "okrs" (default) or "team" (admin only).
+    let page = RwSignal::new("okrs");
 
     let reload = move || {
         spawn_local(async move {
@@ -149,24 +150,6 @@ fn Dashboard(user: Me, on_logout: impl Fn() + 'static + Copy + Send + Sync) -> i
     };
     reload();
 
-    // Admin: create group.
-    let new_group = RwSignal::new(String::new());
-    let create_group = move |_| {
-        let name = new_group.get();
-        if name.trim().is_empty() {
-            return;
-        }
-        spawn_local(async move {
-            match api::post("/groups", json!({ "name": name, "descriptionMd": "" })).await {
-                Ok(_) => {
-                    new_group.set(String::new());
-                    reload();
-                }
-                Err((s, _)) => status.set(format!("Could not create group (HTTP {s})")),
-            }
-        });
-    };
-
     let logout = move |_| {
         spawn_local(async move {
             let _ = api::post("/auth/logout", Value::Null).await;
@@ -177,6 +160,14 @@ fn Dashboard(user: Me, on_logout: impl Fn() + 'static + Copy + Send + Sync) -> i
     view! {
         <header class="topbar">
             <strong>"OKR Tracker"</strong>
+            {is_admin.then(|| view! {
+                <nav class="nav">
+                    <button class="link" class:active=move || page.get() == "okrs"
+                        on:click=move |_| page.set("okrs")>"OKRs"</button>
+                    <button class="link" class:active=move || page.get() == "team"
+                        on:click=move |_| page.set("team")>"Team"</button>
+                </nav>
+            })}
             <span class="spacer"></span>
             <span class="muted">{user.name.clone()}</span>
             {is_admin.then(|| view! { <span class="badge">"admin"</span> })}
@@ -184,61 +175,150 @@ fn Dashboard(user: Me, on_logout: impl Fn() + 'static + Copy + Send + Sync) -> i
         </header>
 
         <section class="content">
-            <Show when=move || is_admin>
+            <Show when=move || is_admin && page.get() == "team">
                 <Team users=users reload=reload />
-                <div class="card">
-                    <h3>"New group"</h3>
+            </Show>
+
+            <Show when=move || page.get() == "okrs">
+                <Show
+                    when=move || !groups.get().is_empty()
+                    fallback=|| view! { <p class="muted center">"No groups yet."</p> }
+                >
+                    <For
+                        each=move || groups.get()
+                        key=|g| g["id"].as_str().unwrap_or("").to_string()
+                        children=move |g| view! {
+                            <GroupCard
+                                group=g is_admin=is_admin me_id=me_id.get_value()
+                                okrs=okrs users=users reload=reload
+                            />
+                        }
+                    />
+                </Show>
+                <Show when=move || is_admin>
+                    <NewGroup reload=reload />
+                </Show>
+            </Show>
+        </section>
+    }
+}
+
+/// One group card: its OKRs, an admin "+ Add OKR" affordance, and an admin
+/// delete control (with inline confirm, since it cascades the group's OKRs).
+#[component]
+fn GroupCard(
+    group: Value,
+    is_admin: bool,
+    me_id: String,
+    okrs: RwSignal<Vec<Value>>,
+    users: RwSignal<Vec<Value>>,
+    reload: impl Fn() + 'static + Copy + Send + Sync,
+) -> impl IntoView {
+    let gid = StoredValue::new(group["id"].as_str().unwrap_or("").to_string());
+    let me_id = StoredValue::new(me_id);
+    let name = group["name"].as_str().unwrap_or("").to_string();
+    let human_ref = group["humanRef"].as_str().unwrap_or("").to_string();
+    let confirming = RwSignal::new(false);
+
+    let group_okrs = move || {
+        let g = gid.get_value();
+        okrs.get()
+            .into_iter()
+            .filter(|o| o["groupId"].as_str() == Some(g.as_str()))
+            .collect::<Vec<_>>()
+    };
+
+    let do_delete = move |_| {
+        let path = format!("/groups/{}", gid.get_value());
+        spawn_local(async move {
+            if api::call("DELETE", &path, None).await.is_ok() {
+                reload();
+            }
+        });
+    };
+
+    view! {
+        <div class="card group">
+            <div class="group-head">
+                <h2>{name}</h2>
+                <code class="ref">{human_ref}</code>
+                <span class="spacer"></span>
+                <Show when=move || is_admin>
+                    {move || if confirming.get() {
+                        view! {
+                            <span class="confirm">
+                                <span class="muted">"Delete group and all its OKRs?"</span>
+                                <button class="danger" on:click=do_delete>"Confirm"</button>
+                                <button class="link" on:click=move |_| confirming.set(false)>"Cancel"</button>
+                            </span>
+                        }.into_any()
+                    } else {
+                        view! {
+                            <button class="link danger" on:click=move |_| confirming.set(true)>"Delete"</button>
+                        }.into_any()
+                    }}
+                </Show>
+            </div>
+            <For
+                each=group_okrs
+                key=|o| o["id"].as_str().unwrap_or("").to_string()
+                children=move |o| view! {
+                    <OkrCard okr=o is_admin=is_admin me_id=me_id.get_value() users=users reload=reload />
+                }
+            />
+            <Show when=move || is_admin>
+                <AddOkr group_id=gid.get_value() reload=reload />
+            </Show>
+        </div>
+    }
+}
+
+/// Subtle inline "+ New group" affordance (group creation is infrequent).
+#[component]
+fn NewGroup(reload: impl Fn() + 'static + Copy + Send + Sync) -> impl IntoView {
+    let open = RwSignal::new(false);
+    let name = RwSignal::new(String::new());
+    let status = RwSignal::new(String::new());
+
+    let create = move |_| {
+        let n = name.get();
+        if n.trim().is_empty() {
+            return;
+        }
+        spawn_local(async move {
+            match api::post("/groups", json!({ "name": n, "descriptionMd": "" })).await {
+                Ok(_) => {
+                    name.set(String::new());
+                    open.set(false);
+                    status.set(String::new());
+                    reload();
+                }
+                Err((s, _)) => status.set(format!("Could not create group (HTTP {s})")),
+            }
+        });
+    };
+
+    view! {
+        <div class="newgroup">
+            {move || if open.get() {
+                view! {
                     <div class="row">
                         <input
                             placeholder="Group name"
-                            on:input=move |e| new_group.set(event_target_value(&e))
-                            prop:value=move || new_group.get()
+                            on:input=move |e| name.set(event_target_value(&e))
+                            prop:value=move || name.get()
                         />
-                        <button class="primary" on:click=create_group>"Add group"</button>
+                        <button class="primary" on:click=create>"Create"</button>
+                        <button class="link" on:click=move |_| open.set(false)>"Cancel"</button>
                     </div>
-                </div>
-            </Show>
-
-            <p class="status">{move || status.get()}</p>
-
-            <Show
-                when=move || !groups.get().is_empty()
-                fallback=|| view! { <p class="muted center">"No groups yet."</p> }
-            >
-                <For
-                    each=move || groups.get()
-                    key=|g| g["id"].as_str().unwrap_or("").to_string()
-                    children=move |g| {
-                        let gid = g["id"].as_str().unwrap_or("").to_string();
-                        let gid_filter = gid.clone();
-                        let group_okrs = move || {
-                            okrs.get()
-                                .into_iter()
-                                .filter(|o| o["groupId"].as_str() == Some(gid_filter.as_str()))
-                                .collect::<Vec<_>>()
-                        };
-                        view! {
-                            <div class="card group">
-                                <div class="group-head">
-                                    <h2>{g["name"].as_str().unwrap_or("").to_string()}</h2>
-                                    <code class="ref">{g["humanRef"].as_str().unwrap_or("").to_string()}</code>
-                                </div>
-                                <For
-                                    each=group_okrs
-                                    key=|o| o["id"].as_str().unwrap_or("").to_string()
-                                    children=move |o| view! {
-                                        <OkrCard okr=o is_admin=is_admin me_id=me_id.get_value() users=users reload=reload />
-                                    }
-                                />
-                                <Show when=move || is_admin>
-                                    <AddOkr group_id=gid.clone() reload=reload />
-                                </Show>
-                            </div>
-                        }
-                    }
-                />
-            </Show>
-        </section>
+                }.into_any()
+            } else {
+                view! {
+                    <button class="link subtle" on:click=move |_| open.set(true)>"＋ New group"</button>
+                }.into_any()
+            }}
+            <span class="status">{move || status.get()}</span>
+        </div>
     }
 }
 
