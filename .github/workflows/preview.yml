@@ -1,0 +1,84 @@
+name: Preview Deploy
+
+# Spec §13.1.2 — every PR gets its OWN isolated Worker (`okr-pr-<number>`) with
+# its OWN Durable Object namespace and therefore an independent, empty
+# datastore. Production passkeys do not work here and vice-versa (§6.5); each
+# preview is bootstrapped fresh with PREVIEW_SETUP_SECRET.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+# Previews of forked PRs would expose deploy credentials, so restrict to
+# same-repo PRs. Secrets are unavailable to fork PRs anyway.
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: preview-${{ github.event.number }}
+  cancel-in-progress: true
+
+jobs:
+  deploy-preview:
+    name: Deploy PR preview
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    environment:
+      name: preview-pr-${{ github.event.number }}
+      url: ${{ steps.meta.outputs.url }}
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CF_ACCOUNT_ID }}
+      WRANGLER: npx --yes wrangler@4.103.0
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compute preview identity
+        id: meta
+        run: |
+          NAME="okr-pr-${{ github.event.number }}"
+          HOST="${NAME}.${{ vars.WORKERS_SUBDOMAIN }}.workers.dev"
+          echo "name=$NAME"           >> "$GITHUB_OUTPUT"
+          echo "host=$HOST"           >> "$GITHUB_OUTPUT"
+          echo "url=https://$HOST"    >> "$GITHUB_OUTPUT"
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - name: Install build tooling
+        run: |
+          cargo install worker-build --locked || true
+          cargo install trunk --version 0.21.7 --locked || true
+
+      - name: Deploy isolated preview Worker
+        run: $WRANGLER deploy --name "${{ steps.meta.outputs.name }}"
+
+      - name: Inject preview config + secrets
+        env:
+          PREVIEW_SETUP_SECRET: ${{ secrets.PREVIEW_SETUP_SECRET }}
+          VAPID_PUBLIC_KEY: ${{ vars.VAPID_PUBLIC_KEY }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          NAME="${{ steps.meta.outputs.name }}"
+          put() { echo -n "$2" | $WRANGLER secret put "$1" --name "$NAME"; }
+          put RP_ID            "${{ steps.meta.outputs.host }}"
+          put RP_ORIGIN        "${{ steps.meta.outputs.url }}"
+          put SETUP_SECRET     "$PREVIEW_SETUP_SECRET"
+          put VAPID_PUBLIC_KEY  "$VAPID_PUBLIC_KEY"
+          put VAPID_PRIVATE_KEY "$VAPID_PRIVATE_KEY"
+
+      - name: Comment preview URL on PR
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: preview
+          message: |
+            ### 🚀 Preview deployed
+
+            **URL:** ${{ steps.meta.outputs.url }}
+
+            This is a fully isolated instance with its own empty datastore.
+            Bootstrap a first admin with the `PREVIEW_SETUP_SECRET` (see
+            `docs/SECRETS.md`). Production passkeys will **not** work here — each
+            preview origin has its own passkey realm (spec §6.5).
